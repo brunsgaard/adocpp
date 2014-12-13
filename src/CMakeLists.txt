@@ -1,10 +1,12 @@
-#SET(headers
-#)
+SET(headers
+  graph.h
+)
 
-#SET(sources
-#dijkstra_demo.cc
-#)
+SET(sources
+  graph.cc
+)
 
-#add_library(compiled OBJECT ${sources} ${headers})
-#add_executable(dijkstra dijkstra_demo.cc)
-add_executable(importer importer.cc)
+add_library(compiled OBJECT ${sources} ${headers})
+add_executable(test $<TARGET_OBJECTS:compiled> main.cc)
+#add_executable(importer importer.cc)
+#add_executable(importer importer.cc)
