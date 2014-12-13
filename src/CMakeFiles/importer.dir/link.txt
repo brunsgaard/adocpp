@@ -1,1 +1,0 @@
-/usr/bin/c++    -Wall -pedantic -std=gnu++11 -Wno-language-extension-token -Wno-unused-function -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names   CMakeFiles/importer.dir/importer.cc.o  -o ../bin/importer  
