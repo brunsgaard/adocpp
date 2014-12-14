@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <unordered_map>
 #include <queue>
 #include <list>
@@ -44,11 +45,20 @@ std::pair<std::vector<Weight>,std::vector<VertexReference>> DijkstraModified(con
 
   std::vector<VertexReference> previous(vertices.size(), VertexNone);
 
+  std::unordered_set<VertexId> fully_relaxed;
+  fully_relaxed.reserve(g.Size());
+
   vertex_queue.insert(std::make_pair(min_distance[source->id], source->id));
   while (!vertex_queue.empty()) {
     auto dist = vertex_queue.begin()->first;
     auto u = vertex_queue.begin()->second;
     vertex_queue.erase(vertex_queue.begin());
+    if (fully_relaxed.count(u) > 0) {
+//      LOG(INFO) << "Already relaxed vertex " << u;
+      continue;
+    } else {
+      fully_relaxed.insert(u);
+    }
     // Visit each edge exiting u
     const std::forward_list<AdjacentNode> &neighbors = vertices[u]->adjacent;
     for (auto neighbor_iter = neighbors.cbegin();

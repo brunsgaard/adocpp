@@ -11,6 +11,7 @@
 #include "ado.h"
 #include "graph.h"
 #include "dijkstra.h"
+#include "utils.h"
 
 bool TakeNode(const int n, const int k) {
   static bool seeded = false;
@@ -51,8 +52,10 @@ void PreProcess(UndirectedGraph &g, const int k) {
       a_dist[k][vid] = std::make_pair(MaxWeight, VertexNone);
   });
 
-  std::unordered_map<VertexId, std::vector<Weight>> clusters;
-  clusters.reserve(g.Size());
+  LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
+
+  //std::unordered_map<VertexId, std::vector<Weight>> clusters;
+  //clusters.reserve(g.Size());
 
   for(int i=k-1; i>=0; --i) {
     // Add a vertex connected to all vertices in our set
@@ -88,19 +91,31 @@ void PreProcess(UndirectedGraph &g, const int k) {
     std::copy_if(a[i].begin(), a[i].end(), std::inserter(a_filtered, a_filtered.begin()), [prev_a](VertexId v) {
       return prev_a.count(v) == 0;
     });
-    std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&g,&a_dist,&clusters,i](VertexId vid) {
+    std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&](VertexId vid) {
+//      LOG(INFO) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
       auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
-      clusters.emplace(vid,r.first);
+      //clusters.emplace(vid,r.first);
     });
+    LOG(INFO) << "Completed IC " << i;
+    LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
   }
 
-
+  LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
 //  std::for_each(a_dist.cbegin(), a_dist.cend(), [](const std::pair<int, const AdoICenter&> &i) {
 //    LOG(INFO) << "ICenter for k:" << i.first;
 //    std::for_each(i.second.cbegin(), i.second.cend(), [](const std::pair<VertexId, const AdoLink&> l) {
 //      LOG(INFO) << "  Vertex: " << l.first << " Dist: " << l.second.first << " Witness: " << l.second.second;
 //    });
+//  });
+//
+//  std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::vector<Weight>&> c) {
+//      LOG(INFO) << "Cluster for vertex " << c.first;
+//      int i = 0;
+//      std::for_each(c.second.cbegin(), c.second.cend(), [&i](Weight w) {
+//        LOG(INFO) << "  " << i++ << ": " << w;
+//      });
+//
 //  });
 
 }
