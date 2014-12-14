@@ -1,25 +1,28 @@
-#include <sys/time.h>
-#include <sys/resource.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <algorithm>
+#include <chrono>
 #include <cstdint>
-#include <cstdio>
 #include <fstream>
 #include <memory>
-#include <chrono>
-#include <algorithm>
 
 #include "graph.h"
+#include "utils.h"
 
-long getMemoryUsage() {
-  struct rusage usage;
-  if (0 == getrusage(RUSAGE_SELF, &usage))
-    return usage.ru_maxrss;  // bytes
-  else
-    return 0;
-}
+DEFINE_string(datafile, "", "File to load as graph data");
+DEFINE_bool(duplicated, false, "Does data file contain duplicated graph data");
 
 int main(int argc, char** argv) {
-  printf("File: %s\n", argv[1]);
-  std::ifstream network(argv[1]);
+  FLAGS_logtostderr = true;
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
+
+  LOG(INFO) << "File: " << FLAGS_datafile;
+  std::ifstream network(FLAGS_datafile);
+  if (!network.good()) {
+    LOG(ERROR) << "Could not open file " << FLAGS_datafile;
+    return 1;
+  }
 
   // Find the largest vertex id
   VertexId a, b, max_id = 0;
@@ -32,9 +35,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Does our file contain duplicated edges for undirected graphs
-  bool duplicated = static_cast<bool>(std::stoi(argv[2]));
-
   network.clear();
   network.seekg(0, std::ios_base::beg);
 
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
   int i = 0;
   std::chrono::system_clock::time_point since_last = start;
   while (network >> a >> b) {
-    if (duplicated) {
+    if (FLAGS_duplicated) {
       g.AddAdjacentNode(a, b);
     } else {
       g.AddEdge(a, b);
@@ -53,22 +53,20 @@ int main(int argc, char** argv) {
     if (++i % 500000 == 0) {
       auto current_time = std::chrono::system_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::minutes>(current_time - start).count();
-      auto iteration = std::chrono::duration_cast<std::chrono::seconds>(current_time - since_last).count();
-      printf("i: %d - last iteration: %lld seconds - total %ld minutes run\n", i, iteration, elapsed);
+      auto iteration = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - since_last).count();
+      LOG(INFO) << "i: " << i << " - last iteration: " << iteration << " ms - total " << elapsed << " min run";
       since_last = current_time;
     }
   }
 
   auto end = std::chrono::system_clock::now();
-  printf("Time spent: %lld\n",
-         std::chrono::duration_cast<std::chrono::seconds>(end - start).count());
-  printf("Ram used: %f\n", static_cast<double>(getMemoryUsage()) / 1024 / 1024);
+  LOG(INFO) << "Time spent: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+  LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
   // Cleanup the graph
   auto cleanup_start = std::chrono::system_clock::now();
   g.RemoveUnconnectedComponents();
   auto cleanup_end = std::chrono::system_clock::now();
-  printf("Time spent during cleanup: %lld\n",
-         std::chrono::duration_cast<std::chrono::seconds>(cleanup_end - cleanup_start).count());
+  LOG(INFO) << "Time spent during cleanup: " << std::chrono::duration_cast<std::chrono::seconds>(cleanup_end - cleanup_start).count();
 
 }

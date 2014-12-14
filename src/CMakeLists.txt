@@ -1,5 +1,6 @@
 SET(headers
   graph.h
+  utils.h
 )
 
 SET(sources
@@ -8,5 +9,4 @@ SET(sources
 
 add_library(compiled OBJECT ${sources} ${headers})
 add_executable(test $<TARGET_OBJECTS:compiled> main.cc)
-#add_executable(importer importer.cc)
-#add_executable(importer importer.cc)
+target_link_libraries(test ${link_libs})
