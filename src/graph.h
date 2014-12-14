@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <forward_list>
 #include <memory>
-#include <cstdint>
+#include <set>
+#include <unordered_set>
 #include <vector>
 
 struct AdjacentNode;
@@ -34,6 +36,8 @@ class UndirectedGraph
  protected:
   uint64_t num_vertices_;
   VertexVector vertices_;
+  std::set<VertexId> valid_vertices_;
+
  public:
   UndirectedGraph(uint64_t num_vertices);
 
@@ -48,5 +52,20 @@ class UndirectedGraph
     AddAdjacentNode(a, b, 1);
   }
 
-  void Print();
+  void Print() const;
+  inline const VertexVector& Get() const {
+    return vertices_;
+  }
+
+  class BiggestSetCompare
+  {
+   public:
+    BiggestSetCompare() {}
+    bool operator() (const std::unordered_set<VertexId>& lhs, const std::unordered_set<VertexId>&rhs) const
+    {
+      return lhs.size() < rhs.size();
+    }
+  };
+
+  void RemoveUnconnectedComponents();
 };

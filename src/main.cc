@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     } else {
       g.AddEdge(a, b);
     }
-    if (++i % 50000 == 0) {
+    if (++i % 500000 == 0) {
       auto current_time = std::chrono::system_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::minutes>(current_time - start).count();
       auto iteration = std::chrono::duration_cast<std::chrono::seconds>(current_time - since_last).count();
@@ -63,4 +63,12 @@ int main(int argc, char** argv) {
   printf("Time spent: %lld\n",
          std::chrono::duration_cast<std::chrono::seconds>(end - start).count());
   printf("Ram used: %f\n", static_cast<double>(getMemoryUsage()) / 1024 / 1024);
+
+  // Cleanup the graph
+  auto cleanup_start = std::chrono::system_clock::now();
+  g.RemoveUnconnectedComponents();
+  auto cleanup_end = std::chrono::system_clock::now();
+  printf("Time spent during cleanup: %lld\n",
+         std::chrono::duration_cast<std::chrono::seconds>(cleanup_end - cleanup_start).count());
+
 }
