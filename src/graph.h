@@ -57,6 +57,14 @@ class UndirectedGraph
     return vertices_;
   }
 
+  uint64_t Size() const {
+    return valid_vertices_.size();
+  }
+
+  const std::set<VertexId>& ValidIds() const {
+    return valid_vertices_;
+  }
+
   class BiggestSetCompare
   {
    public:
