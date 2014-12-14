@@ -9,7 +9,9 @@
 
 struct AdjacentNode;
 struct Vertex;
-typedef uint8_t Weight;
+typedef double Weight;
+const Weight MaxWeight = std::numeric_limits<double>::infinity();
+
 typedef std::vector<std::shared_ptr<Vertex>> VertexVector;
 typedef VertexVector::size_type VertexId;
 
@@ -43,13 +45,13 @@ class UndirectedGraph
 
   void AddEdge(VertexId a, VertexId b, Weight w);
   inline void AddEdge(VertexId a, VertexId b) {
-    AddEdge(a, b, 1);
+    AddEdge(a, b, 1.0);
   }
   inline void AddAdjacentNode(VertexId a, VertexId b, Weight w) {
     vertices_[a]->adjacent.emplace_front(vertices_[b], w);
   }
   void AddAdjacentNode(VertexId a, VertexId b) {
-    AddAdjacentNode(a, b, 1);
+    AddAdjacentNode(a, b, 1.0);
   }
 
   void Print() const;

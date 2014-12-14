@@ -8,6 +8,7 @@
 
 #include "graph.h"
 #include "utils.h"
+#include "dijkstra.h"
 
 DEFINE_string(datafile, "", "File to load as graph data");
 DEFINE_bool(duplicated, false, "Does data file contain duplicated graph data");
@@ -68,5 +69,16 @@ int main(int argc, char** argv) {
   g.RemoveUnconnectedComponents();
   auto cleanup_end = std::chrono::system_clock::now();
   LOG(INFO) << "Time spent during cleanup: " << std::chrono::duration_cast<std::chrono::seconds>(cleanup_end - cleanup_start).count();
+
+
+  // Dijkstra test
+  auto dijkstra_start = std::chrono::system_clock::now();
+
+  auto dist = dijkstra(g, g.Get().front());
+  LOG(INFO) << " Distances " << dist.size();
+
+  auto dijkstra_end = std::chrono::system_clock::now();
+  LOG(INFO) << "Dijkstra bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(dijkstra_end - dijkstra_start).count() << " ms";
+
 
 }
