@@ -1,8 +1,9 @@
-#include "graph.h"
+#include <glog/logging.h>
 #include <algorithm>
 #include <cstdio>
 #include <queue>
 
+#include "graph.h"
 #include "dfs.h"
 
 UndirectedGraph::UndirectedGraph(uint64_t num_vertices) : num_vertices_(num_vertices), vertices_(), valid_vertices_() {
@@ -26,12 +27,12 @@ void UndirectedGraph::Print() const {
     if (vertex.get() == NULL) {
       return;
     }
-    printf("\n Adjacency list of vertex %lu\n head ", vertex->id);
+    LOG(INFO) << "Adjacency list of vertex " << vertex->id << " head ";
     std::for_each(
       vertex->adjacent.cbegin(),
       vertex->adjacent.cend(),
       [](const AdjacentNode &node) {
-        printf("-> %lu", node.vertex->id);
+        LOG(INFO) << "-> " << node.vertex->id;
       });
     }
   );

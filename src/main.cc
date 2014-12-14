@@ -13,6 +13,62 @@
 DEFINE_string(datafile, "", "File to load as graph data");
 DEFINE_bool(duplicated, false, "Does data file contain duplicated graph data");
 
+
+UndirectedGraph loadWeightedGraph(std::ifstream &file) {
+  // Find the largest vertex id
+  VertexId a, b, max_id = 0;
+  Weight w;
+  while (file >> a >> b >> w) {
+    if (a > max_id) {
+      max_id = a;
+    }
+    if (b > max_id) {
+      max_id = b;
+    }
+  }
+
+  file.clear();
+  file.seekg(0, std::ios_base::beg);
+
+  UndirectedGraph g(max_id+1);
+
+  while (file >> a >> b >> w) {
+    if (FLAGS_duplicated) {
+      g.AddAdjacentNode(a, b, w);
+    } else {
+      g.AddEdge(a, b, w);
+    }
+  }
+  return g;
+}
+
+UndirectedGraph loadUnweightedGraph(std::ifstream &file) {
+  // Find the largest vertex id
+  VertexId a, b, max_id = 0;
+  while (file >> a >> b) {
+    if (a > max_id) {
+      max_id = a;
+    }
+    if (b > max_id) {
+      max_id = b;
+    }
+  }
+
+  file.clear();
+  file.seekg(0, std::ios_base::beg);
+
+  UndirectedGraph g(max_id+1);
+
+  while (file >> a >> b) {
+    if (FLAGS_duplicated) {
+      g.AddAdjacentNode(a, b);
+    } else {
+      g.AddEdge(a, b);
+    }
+  }
+  return g;
+}
+
 int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -25,39 +81,25 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Find the largest vertex id
-  VertexId a, b, max_id = 0;
-  while (network >> a >> b) {
-    if (a > max_id) {
-      max_id = a;
-    }
-    if (b > max_id) {
-      max_id = b;
-    }
-  }
-
-  network.clear();
-  network.seekg(0, std::ios_base::beg);
-
-  auto g = UndirectedGraph(max_id+1);
-
   auto start = std::chrono::system_clock::now();
 
-  int i = 0;
-  std::chrono::system_clock::time_point since_last = start;
-  while (network >> a >> b) {
-    if (FLAGS_duplicated) {
-      g.AddAdjacentNode(a, b);
-    } else {
-      g.AddEdge(a, b);
-    }
-    if (++i % 500000 == 0) {
-      auto current_time = std::chrono::system_clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::minutes>(current_time - start).count();
-      auto iteration = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - since_last).count();
-      LOG(INFO) << "i: " << i << " - last iteration: " << iteration << " ms - total " << elapsed << " min run";
-      since_last = current_time;
-    }
+  // Test if our file is weighted
+  std::string line;
+  std::getline(network, line);
+  auto tokens = countWordsInString(line);
+  network.clear();
+  network.seekg(0, std::ios_base::beg);
+  UndirectedGraph g(0);
+  LOG(INFO) << "Tokens " << tokens;
+  if (tokens == 3) {
+    LOG(INFO) << "Looks like a weighted graph";
+    g = loadWeightedGraph(network);
+  } else if (tokens == 2) {
+    LOG(INFO) << "Looks like an un-weighted graph";
+    g = loadUnweightedGraph(network);
+  } else {
+    LOG(ERROR) << "Did not understand format of file";
+    return 1;
   }
 
   auto end = std::chrono::system_clock::now();
@@ -74,8 +116,16 @@ int main(int argc, char** argv) {
   // Dijkstra test
   auto dijkstra_start = std::chrono::system_clock::now();
 
-  auto dist = dijkstra(g, g.Get().front());
+  // Get first valid vertex
+  auto head = g.Get()[*(g.ValidIds().cbegin())];
+
+  auto dist = dijkstra(g, head);
   LOG(INFO) << " Distances " << dist.size();
+
+//  int i = 0;
+//  for (auto it = dist.cbegin(); it != dist.cend(); ++it) {
+//    LOG(INFO) << i++ << ": " << *it;
+//  }
 
   auto dijkstra_end = std::chrono::system_clock::now();
   LOG(INFO) << "Dijkstra bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(dijkstra_end - dijkstra_start).count() << " ms";
