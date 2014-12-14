@@ -51,6 +51,9 @@ void PreProcess(UndirectedGraph &g, const int k) {
       a_dist[k][vid] = std::make_pair(MaxWeight, VertexNone);
   });
 
+  std::unordered_map<VertexId, std::vector<Weight>> clusters;
+  clusters.reserve(g.Size());
+
   for(int i=k-1; i>=0; --i) {
     // Add a vertex connected to all vertices in our set
     auto vid_max = *g.ValidIds().rbegin()+1;
@@ -59,7 +62,7 @@ void PreProcess(UndirectedGraph &g, const int k) {
       g.AddEdge(vid_max, vid, 0);
     });
     // Run dijkstra from our added node
-    auto r = dijkstra(g, g.Get()[vid_max]);
+    auto r = Dijkstra(g, g.Get()[vid_max]);
     // Update a_dist
     std::for_each(g.ValidIds().cbegin(), g.ValidIds().cend(), [&a_dist,&r,i](VertexId vid) {
       auto dist = r.first[vid];
@@ -79,7 +82,19 @@ void PreProcess(UndirectedGraph &g, const int k) {
       n.vertex->adjacent.pop_front();
     });
     g.ResetVertex(vid_max);
+
+    std::unordered_set<VertexId> a_filtered;
+    auto prev_a = a[i+1];
+    std::copy_if(a[i].begin(), a[i].end(), std::inserter(a_filtered, a_filtered.begin()), [prev_a](VertexId v) {
+      return prev_a.count(v) == 0;
+    });
+    std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&g,&a_dist,&clusters,i](VertexId vid) {
+      auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
+      clusters.emplace(vid,r.first);
+    });
   }
+
+
 
 //  std::for_each(a_dist.cbegin(), a_dist.cend(), [](const std::pair<int, const AdoICenter&> &i) {
 //    LOG(INFO) << "ICenter for k:" << i.first;

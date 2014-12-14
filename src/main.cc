@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
   // Get first valid vertex
   auto head = g.Get()[*(g.ValidIds().cbegin())];
 
-  auto dist = dijkstra(g, head);
+  auto dist = Dijkstra(g, head);
   LOG(INFO) << " Distances " << dist.first.size();
 
 //  int i = 0;
@@ -130,5 +130,11 @@ int main(int argc, char** argv) {
   auto dijkstra_end = std::chrono::system_clock::now();
   LOG(INFO) << "Dijkstra bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(dijkstra_end - dijkstra_start).count() << " ms";
 
+  // Pre process bench
+  auto prepro_start = std::chrono::system_clock::now();
+
   PreProcess(g, 2);
+
+  auto prepro_end = std::chrono::system_clock::now();
+  LOG(INFO) << "Preprocess bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(prepro_end - prepro_start).count() << " ms";
 }
