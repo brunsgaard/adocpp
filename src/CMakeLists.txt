@@ -3,12 +3,14 @@ SET(headers
   utils.h
   dfs.h
   dijkstra.h
+  ado.h
 )
 
 SET(sources
   graph.cc
   dfs.cc
   dijkstra.cc
+  ado.cc
 )
 
 add_library(compiled OBJECT ${sources} ${headers})

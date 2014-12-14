@@ -9,6 +9,7 @@
 #include "graph.h"
 #include "utils.h"
 #include "dijkstra.h"
+#include "ado.h"
 
 DEFINE_string(datafile, "", "File to load as graph data");
 DEFINE_bool(duplicated, false, "Does data file contain duplicated graph data");
@@ -130,5 +131,5 @@ int main(int argc, char** argv) {
   auto dijkstra_end = std::chrono::system_clock::now();
   LOG(INFO) << "Dijkstra bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(dijkstra_end - dijkstra_start).count() << " ms";
 
-
+  prepro(g, 2);
 }
