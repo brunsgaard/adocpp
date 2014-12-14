@@ -15,6 +15,9 @@ const Weight MaxWeight = std::numeric_limits<double>::infinity();
 typedef std::vector<std::shared_ptr<Vertex>> VertexVector;
 typedef VertexVector::size_type VertexId;
 
+typedef int64_t VertexReference;
+const VertexReference VertexNone = -1;
+
 struct AdjacentNode
 {
   std::shared_ptr<Vertex> vertex;
@@ -55,16 +58,24 @@ class UndirectedGraph
   }
 
   void Print() const;
+
   inline const VertexVector& Get() const {
     return vertices_;
   }
 
-  uint64_t Size() const {
+  inline uint64_t Size() const {
     return valid_vertices_.size();
   }
 
-  const std::set<VertexId>& ValidIds() const {
+  inline const std::set<VertexId>& ValidIds() const {
     return valid_vertices_;
+  }
+
+  inline void ResetVertex(const VertexId vid) {
+    vertices_[vid].reset();
+  }
+  inline void InitVertex(const VertexId vid) {
+    vertices_[vid].reset(new Vertex(vid));
   }
 
   class BiggestSetCompare

@@ -2,18 +2,16 @@
 #include <queue>
 #include <list>
 #include <algorithm>
+
 #include "dijkstra.h"
 
-std::vector<Weight> dijkstra(const UndirectedGraph &g,
-                             const std::shared_ptr<Vertex> &source) {
+std::pair<std::vector<Weight>,std::vector<VertexReference>> dijkstra(const UndirectedGraph &g, const std::shared_ptr<Vertex> &source) {
   auto const &vertices = g.Get();
   std::vector<Weight> min_distance(vertices.size(), MaxWeight);
   min_distance[source->id] = 0.0;
   std::set<std::pair<Weight, VertexId> > vertex_queue;
-  std::vector<VertexId> previous;
-  previous.clear();
-  previous.resize(vertices.size(), -1);
 
+  std::vector<VertexReference> previous(vertices.size(), VertexNone);
 
   vertex_queue.insert(std::make_pair(min_distance[source->id], source->id));
   while (!vertex_queue.empty()) {
@@ -35,15 +33,15 @@ std::vector<Weight> dijkstra(const UndirectedGraph &g,
       }
     }
   }
-  return min_distance;
+  return std::make_pair(min_distance, previous);
 }
 
-std::list<VertexId> DijkstraGetShortestPathTo(
-    VertexId vid, const std::vector<VertexId> &previous)
-{
-    std::list<VertexId> path;
-    for ( ; vid != -1; vid = previous[vid])
+std::list<VertexReference> DijkstraGetShortestPathTo(
+    VertexReference vid, const std::vector<VertexReference> &previous) {
+    std::list<VertexReference> path;
+    for ( ; vid != VertexNone; vid = previous[vid]) {
         path.push_front(vid);
+    }
     return path;
 }
 

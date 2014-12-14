@@ -4,10 +4,8 @@
 #include <cstdint>
 #include "graph.h"
 
-typedef int64_t VertexReference;
-const VertexReference VertexNone = -1;
-typedef std::unordered_map<
-    int, std::unordered_map<VertexId, std::pair<Weight, VertexReference>>>
-    AdoADict;
+typedef std::pair<Weight, VertexReference> AdoLink;
+typedef std::unordered_map<VertexId, AdoLink> AdoICenter;
+typedef std::unordered_map<int, AdoICenter> AdoADict;
 
-void prepro(const UndirectedGraph &g, const int k);
+void PreProcess(UndirectedGraph &g, const int k);

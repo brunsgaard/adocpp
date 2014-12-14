@@ -31,7 +31,7 @@ UndirectedGraph loadWeightedGraph(std::ifstream &file) {
   file.clear();
   file.seekg(0, std::ios_base::beg);
 
-  UndirectedGraph g(max_id+1);
+  UndirectedGraph g(max_id+2);
 
   while (file >> a >> b >> w) {
     if (FLAGS_duplicated) {
@@ -58,7 +58,7 @@ UndirectedGraph loadUnweightedGraph(std::ifstream &file) {
   file.clear();
   file.seekg(0, std::ios_base::beg);
 
-  UndirectedGraph g(max_id+1);
+  UndirectedGraph g(max_id+2);
 
   while (file >> a >> b) {
     if (FLAGS_duplicated) {
@@ -91,7 +91,6 @@ int main(int argc, char** argv) {
   network.clear();
   network.seekg(0, std::ios_base::beg);
   UndirectedGraph g(0);
-  LOG(INFO) << "Tokens " << tokens;
   if (tokens == 3) {
     LOG(INFO) << "Looks like a weighted graph";
     g = loadWeightedGraph(network);
@@ -121,7 +120,7 @@ int main(int argc, char** argv) {
   auto head = g.Get()[*(g.ValidIds().cbegin())];
 
   auto dist = dijkstra(g, head);
-  LOG(INFO) << " Distances " << dist.size();
+  LOG(INFO) << " Distances " << dist.first.size();
 
 //  int i = 0;
 //  for (auto it = dist.cbegin(); it != dist.cend(); ++it) {
@@ -131,5 +130,5 @@ int main(int argc, char** argv) {
   auto dijkstra_end = std::chrono::system_clock::now();
   LOG(INFO) << "Dijkstra bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(dijkstra_end - dijkstra_start).count() << " ms";
 
-  prepro(g, 2);
+  PreProcess(g, 2);
 }

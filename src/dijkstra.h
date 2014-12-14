@@ -2,9 +2,12 @@
 
 #include <memory>
 #include <vector>
+#include <utility>
+#include <list>
 
 #include "graph.h"
 
-std::vector<Weight> dijkstra(const UndirectedGraph &g,
-                             const std::shared_ptr<Vertex> &source);
+std::pair<std::vector<Weight>,std::vector<VertexReference>> dijkstra(const UndirectedGraph &g, const std::shared_ptr<Vertex> &source);
 
+std::list<VertexReference> DijkstraGetShortestPathTo(
+    VertexReference vid, const std::vector<VertexReference> &previous);
