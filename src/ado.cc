@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <vector>
 #include <unordered_set>
-#include <cstdlib>
+#include <random>
 #include <ctime>
 
 #include "ado.h"
@@ -14,12 +14,8 @@
 #include "utils.h"
 
 bool TakeNode(const int n, const int k) {
-  static bool seeded = false;
-  if (!seeded) {
-    srand(9);
-    seeded = true;
-  }
-  float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+  static std::mt19937 mt(9);
+  float r = static_cast<double>(mt()) / static_cast<double>(mt.max());
   return r <= pow(n, -1.0 / static_cast<double>(k));
 }
 
@@ -143,4 +139,15 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
     });
   }
   return std::make_pair(a_dist, bunch);
+}
+
+Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v) {
+  auto w = u;
+  int i = 0;
+  while (b.at(v).count(w) == 0) {
+    ++i;
+    std::swap(v,u);
+    w = a.at(i).at(u).second;
+  }
+  return a.at(i).at(u).first + b.at(v).at(w);
 }

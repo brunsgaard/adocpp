@@ -13,6 +13,8 @@
 
 DEFINE_string(datafile, "", "File to load as graph data");
 DEFINE_bool(duplicated, false, "Does data file contain duplicated graph data");
+DEFINE_int64(a, 2000, "From where?");
+DEFINE_int64(b, 3000, "To where?");
 
 
 UndirectedGraph loadWeightedGraph(std::ifstream &file) {
@@ -133,8 +135,10 @@ int main(int argc, char** argv) {
   // Pre process bench
   auto prepro_start = std::chrono::system_clock::now();
 
-  PreProcess(g, 2);
+  auto preprocessed = PreProcess(g, 2);
 
   auto prepro_end = std::chrono::system_clock::now();
   LOG(INFO) << "Preprocess bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(prepro_end - prepro_start).count() << " ms";
+
+  LOG(INFO) << FLAGS_a << "->" << FLAGS_b << ":  " << Distk(preprocessed.first, preprocessed.second, FLAGS_a, FLAGS_b);
 }
