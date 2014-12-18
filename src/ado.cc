@@ -46,6 +46,14 @@ void PreProcess(UndirectedGraph &g, const int k) {
   } while (a.back().size() == 0);
   a.emplace_back();
 
+  int i = 0;
+  std::for_each(a.cbegin(), a.cend(), [&i](const std::unordered_set<VertexId> &s) {
+    LOG(INFO) << "Set " << i++;
+    std::for_each(s.cbegin(), s.cend(), [](VertexId vid) {
+        LOG(INFO) << "   " << vid;
+    });
+  });
+
   AdoADict a_dist;
   a_dist.reserve(k+1);
   std::for_each(g.ValidIds().cbegin(), g.ValidIds().cend(), [&a_dist, k](VertexId vid){
@@ -54,8 +62,7 @@ void PreProcess(UndirectedGraph &g, const int k) {
 
   LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
-  //std::unordered_map<VertexId, std::vector<Weight>> clusters;
-  //clusters.reserve(g.Size());
+  std::unordered_map<VertexId, std::unordered_map<VertexId, Weight>> clusters;
 
   for(int i=k-1; i>=0; --i) {
     // Add a vertex connected to all vertices in our set
@@ -92,9 +99,9 @@ void PreProcess(UndirectedGraph &g, const int k) {
       return prev_a.count(v) == 0;
     });
     std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&](VertexId vid) {
-//      LOG(INFO) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
+      LOG(INFO) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
       auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
-      //clusters.emplace(vid,r.first);
+      clusters.insert(std::make_pair(vid, r));
     });
     LOG(INFO) << "Completed IC " << i;
     LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
@@ -102,20 +109,20 @@ void PreProcess(UndirectedGraph &g, const int k) {
 
   LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
-//  std::for_each(a_dist.cbegin(), a_dist.cend(), [](const std::pair<int, const AdoICenter&> &i) {
-//    LOG(INFO) << "ICenter for k:" << i.first;
-//    std::for_each(i.second.cbegin(), i.second.cend(), [](const std::pair<VertexId, const AdoLink&> l) {
-//      LOG(INFO) << "  Vertex: " << l.first << " Dist: " << l.second.first << " Witness: " << l.second.second;
-//    });
-//  });
-//
-//  std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::vector<Weight>&> c) {
-//      LOG(INFO) << "Cluster for vertex " << c.first;
-//      int i = 0;
-//      std::for_each(c.second.cbegin(), c.second.cend(), [&i](Weight w) {
-//        LOG(INFO) << "  " << i++ << ": " << w;
-//      });
-//
-//  });
+  std::for_each(a_dist.cbegin(), a_dist.cend(), [](const std::pair<int, const AdoICenter&> &i) {
+    LOG(INFO) << "ICenter for k:" << i.first;
+    std::for_each(i.second.cbegin(), i.second.cend(), [](const std::pair<VertexId, const AdoLink&> l) {
+      LOG(INFO) << "  Vertex: " << l.first << " Dist: " << l.second.first << " Witness: " << l.second.second;
+    });
+  });
+
+  std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+      LOG(INFO) << "Cluster for vertex " << c.first;
+      int i = 0;
+      std::for_each(c.second.cbegin(), c.second.cend(), [&i](const std::pair<VertexId, Weight>& w) {
+        LOG(INFO) << "  " << w.first << ": " << w.second;
+      });
+
+  });
 
 }
