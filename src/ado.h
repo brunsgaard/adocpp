@@ -7,5 +7,6 @@
 typedef std::pair<Weight, VertexReference> AdoLink;
 typedef std::unordered_map<VertexId, AdoLink> AdoICenter;
 typedef std::unordered_map<int, AdoICenter> AdoADict;
+typedef std::unordered_map<VertexId, std::unordered_map<VertexId, Weight>> AdoVertexDistMap;
 
-void PreProcess(UndirectedGraph &g, const int k);
+std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k);

@@ -23,7 +23,7 @@ bool TakeNode(const int n, const int k) {
   return r <= pow(n, -1.0 / static_cast<double>(k));
 }
 
-void PreProcess(UndirectedGraph &g, const int k) {
+std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k) {
   std::vector<std::unordered_set<VertexId>> a;
   // setup A1 - Ak
   do {
@@ -46,13 +46,15 @@ void PreProcess(UndirectedGraph &g, const int k) {
   } while (a.back().size() == 0);
   a.emplace_back();
 
-  int i = 0;
-  std::for_each(a.cbegin(), a.cend(), [&i](const std::unordered_set<VertexId> &s) {
-    LOG(INFO) << "Set " << i++;
-    std::for_each(s.cbegin(), s.cend(), [](VertexId vid) {
-        LOG(INFO) << "   " << vid;
+  if (VLOG_IS_ON(2)) {
+    int i = 0;
+    std::for_each(a.cbegin(), a.cend(), [&i](const std::unordered_set<VertexId> &s) {
+      VLOG(2) << "Set " << i++;
+      std::for_each(s.cbegin(), s.cend(), [](VertexId vid) {
+          VLOG(2) << "   " << vid;
+      });
     });
-  });
+  }
 
   AdoADict a_dist;
   a_dist.reserve(k+1);
@@ -60,9 +62,9 @@ void PreProcess(UndirectedGraph &g, const int k) {
       a_dist[k][vid] = std::make_pair(MaxWeight, VertexNone);
   });
 
-  LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
+  VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
-  std::unordered_map<VertexId, std::unordered_map<VertexId, Weight>> clusters;
+  AdoVertexDistMap clusters;
 
   for(int i=k-1; i>=0; --i) {
     // Add a vertex connected to all vertices in our set
@@ -99,30 +101,46 @@ void PreProcess(UndirectedGraph &g, const int k) {
       return prev_a.count(v) == 0;
     });
     std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&](VertexId vid) {
-      LOG(INFO) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
+      VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
       auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
       clusters.insert(std::make_pair(vid, r));
     });
-    LOG(INFO) << "Completed IC " << i;
-    LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
+    VLOG(1) << "Completed IC " << i;
+    VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
   }
 
-  LOG(INFO) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
-  std::for_each(a_dist.cbegin(), a_dist.cend(), [](const std::pair<int, const AdoICenter&> &i) {
-    LOG(INFO) << "ICenter for k:" << i.first;
-    std::for_each(i.second.cbegin(), i.second.cend(), [](const std::pair<VertexId, const AdoLink&> l) {
-      LOG(INFO) << "  Vertex: " << l.first << " Dist: " << l.second.first << " Witness: " << l.second.second;
-    });
-  });
-
-  std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
-      LOG(INFO) << "Cluster for vertex " << c.first;
-      int i = 0;
-      std::for_each(c.second.cbegin(), c.second.cend(), [&i](const std::pair<VertexId, Weight>& w) {
-        LOG(INFO) << "  " << w.first << ": " << w.second;
+  AdoVertexDistMap bunch;
+  std::for_each(clusters.cbegin(), clusters.cend(), [&bunch](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+      auto vid = c.first;
+      std::for_each(c.second.cbegin(), c.second.cend(), [&bunch,vid](const std::pair<VertexId, Weight>& w) {
+          bunch[w.first][vid] = w.second;
       });
-
   });
 
+
+  VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
+
+  if (VLOG_IS_ON(2)) {
+    std::for_each(a_dist.cbegin(), a_dist.cend(), [](const std::pair<int, const AdoICenter&> &i) {
+      VLOG(2) << "ICenter for k:" << i.first;
+      std::for_each(i.second.cbegin(), i.second.cend(), [](const std::pair<VertexId, const AdoLink&> l) {
+        VLOG(2) << "  Vertex: " << l.first << " Dist: " << l.second.first << " Witness: " << l.second.second;
+      });
+    });
+    std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+        VLOG(2) << "Cluster for vertex " << c.first;
+        std::for_each(c.second.cbegin(), c.second.cend(), [](const std::pair<VertexId, Weight>& w) {
+          VLOG(2) << "  " << w.first << ": " << w.second;
+        });
+
+    });
+    std::for_each(bunch.cbegin(), bunch.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+        VLOG(2) << "Bunch for vertex " << c.first;
+        std::for_each(c.second.cbegin(), c.second.cend(), [](const std::pair<VertexId, Weight>& w) {
+          VLOG(2) << "  " << w.first << ": " << w.second;
+        });
+    });
+  }
+  return std::make_pair(a_dist, bunch);
 }

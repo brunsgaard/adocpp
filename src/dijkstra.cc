@@ -40,26 +40,20 @@ std::pair<std::vector<Weight>,std::vector<VertexReference>> Dijkstra(const Undir
 std::unordered_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
   auto const &vertices = g.Get();
   std::unordered_map<VertexId, Weight> min_distance;
-  min_distance.emplace(source->id, 0.0);
-
   std::set<std::pair<Weight, VertexId> > vertex_queue;
-
-  //std::vector<VertexReference> previous(vertices.size(), VertexNone);
-
-  std::unordered_set<VertexId> fully_relaxed;
-  fully_relaxed.reserve(g.Size());
 
   vertex_queue.insert(std::make_pair(0.0, source->id));
   while (!vertex_queue.empty()) {
     auto dist = vertex_queue.begin()->first;
     auto u = vertex_queue.begin()->second;
     vertex_queue.erase(vertex_queue.begin());
-    if (fully_relaxed.count(u) > 0) {
-//      LOG(INFO) << "Already relaxed vertex " << u;
+
+    // Already searched this node
+    if (min_distance.count(u) > 0) {
       continue;
-    } else {
-      fully_relaxed.insert(u);
     }
+    min_distance[u] = dist;
+
     // Visit each edge exiting u
     const std::forward_list<AdjacentNode> &neighbors = vertices[u]->adjacent;
     for (auto neighbor_iter = neighbors.cbegin();
@@ -68,12 +62,7 @@ std::unordered_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, 
       Weight weight = neighbor_iter->weight;
       Weight distance_through_u = dist + weight;
       if (distance_through_u < ic.at(v).first) {
-        auto it = min_distance.find(v);
-        Weight w = (it == min_distance.end()) ? MaxWeight : it->second;
-        vertex_queue.erase(std::make_pair(w, v));
-        min_distance[v] = distance_through_u;
-        //previous[v] = u;
-        vertex_queue.emplace(w, v);
+        vertex_queue.emplace(distance_through_u, v);
       }
     }
   }
