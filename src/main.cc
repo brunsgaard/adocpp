@@ -114,6 +114,9 @@ int main(int argc, char** argv) {
   auto cleanup_end = std::chrono::system_clock::now();
   LOG(INFO) << "Time spent during cleanup: " << std::chrono::duration_cast<std::chrono::seconds>(cleanup_end - cleanup_start).count();
 
+  // Verify a and b exists
+  CHECK_GT(g.ValidIds().count(FLAGS_a),0);
+  CHECK_GT(g.ValidIds().count(FLAGS_b),0);
 
   // Dijkstra test
   auto dijkstra_start = std::chrono::system_clock::now();

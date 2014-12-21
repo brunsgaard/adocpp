@@ -27,9 +27,15 @@ find_library(GLOG_LIB glog REQUIRED)
 find_path(GLOG_INCLUDE logging.h PATH_SUFFIXES glog)
 include_directories(${GLOG_INCLUDE})
 
+# TBB (threadingbuildingblocks.org)
+find_library(TBB_LIB tbb REQUIRED)
+find_path(TBB_INCLUDE_DIR tbb.h PATH_SUFFIXES tbb REQUIRED)
+include_directories(${TBB_INCLUDE_DIR})
+
 set(link_libs
   ${GLOG_LIB}
   ${GFLAGS_LIB}
+  ${TBB_LIB}
 )
 
 add_subdirectory (src)

@@ -1,5 +1,7 @@
 #include <glog/logging.h>
+#include <tbb/tbb.h>
 
+#include <atomic>
 #include <unordered_map>
 #include <queue>
 #include <algorithm>
@@ -60,7 +62,8 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
 
   VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
-  AdoVertexDistMap clusters;
+  //AdoVertexDistMap clusters;
+  auto concurrent_clusters = std::make_shared<AdoVertexConcurrentDistMap>();
 
   for(int i=k-1; i>=0; --i) {
     // Add a vertex connected to all vertices in our set
@@ -96,18 +99,45 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
     std::copy_if(a[i].begin(), a[i].end(), std::inserter(a_filtered, a_filtered.begin()), [prev_a](VertexId v) {
       return prev_a.count(v) == 0;
     });
-    std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&](VertexId vid) {
-      VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
-      auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
-      clusters.insert(std::make_pair(vid, r));
+    std::vector<VertexId> a_vector(a_filtered.cbegin(), a_filtered.cend());
+
+    std::atomic_uint_least64_t v_count(0);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0,a_vector.size()),
+        [concurrent_clusters,&a_dist,&g,&a_vector,i,&v_count](const tbb::blocked_range<size_t>& r) {
+      for(size_t n=r.begin(); n!=r.end(); ++n) {
+        auto vid = a_vector[n];
+        VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
+        auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
+        AdoVertexConcurrentDistMap::accessor a;
+        concurrent_clusters->insert(a, vid);
+        a->second = r;
+        // Output useful stats every 10 seconds
+        FB_LOG_EVERY_MS(INFO,10000) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
+        FB_LOG_EVERY_MS(INFO,10000) << "Clusters computed: " << concurrent_clusters->size();
+        uint_least64_t counter = v_count.fetch_add(1);
+        FB_LOG_EVERY_MS(INFO,10000) << "Current: " << (counter+1) << "/" << a_vector.size();
+      }
     });
+
+//    std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&](VertexId vid) {
+//      VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
+//      auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
+//      clusters.insert(std::make_pair(vid, r));
+//    });
     VLOG(1) << "Completed IC " << i;
     VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
   }
 
 
   AdoVertexDistMap bunch;
-  std::for_each(clusters.cbegin(), clusters.cend(), [&bunch](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+//  std::for_each(clusters.cbegin(), clusters.cend(), [&bunch](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+//      auto vid = c.first;
+//      std::for_each(c.second.cbegin(), c.second.cend(), [&bunch,vid](const std::pair<VertexId, Weight>& w) {
+//          bunch[w.first][vid] = w.second;
+//      });
+//  });
+  std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [&bunch](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
       auto vid = c.first;
       std::for_each(c.second.cbegin(), c.second.cend(), [&bunch,vid](const std::pair<VertexId, Weight>& w) {
           bunch[w.first][vid] = w.second;
@@ -124,7 +154,8 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
         VLOG(2) << "  Vertex: " << l.first << " Dist: " << l.second.first << " Witness: " << l.second.second;
       });
     });
-    std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+//    std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+    std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
         VLOG(2) << "Cluster for vertex " << c.first;
         std::for_each(c.second.cbegin(), c.second.cend(), [](const std::pair<VertexId, Weight>& w) {
           VLOG(2) << "  " << w.first << ": " << w.second;
