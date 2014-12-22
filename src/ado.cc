@@ -137,9 +137,9 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
 //          bunch[w.first][vid] = w.second;
 //      });
 //  });
-  std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [&bunch](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+  std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [&bunch](const std::pair<VertexId, const google::sparse_hash_map<VertexId, Weight>&> c) {
       auto vid = c.first;
-      std::for_each(c.second.cbegin(), c.second.cend(), [&bunch,vid](const std::pair<VertexId, Weight>& w) {
+      std::for_each(c.second.begin(), c.second.end(), [&bunch,vid](const std::pair<VertexId, Weight>& w) {
           bunch[w.first][vid] = w.second;
       });
   });
@@ -155,9 +155,9 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
       });
     });
 //    std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
-    std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
+    std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [](const std::pair<VertexId, const google::sparse_hash_map<VertexId, Weight>&> c) {
         VLOG(2) << "Cluster for vertex " << c.first;
-        std::for_each(c.second.cbegin(), c.second.cend(), [](const std::pair<VertexId, Weight>& w) {
+        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<VertexId, Weight>& w) {
           VLOG(2) << "  " << w.first << ": " << w.second;
         });
 

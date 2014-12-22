@@ -42,6 +42,7 @@ class UndirectedGraph
   uint64_t num_vertices_;
   VertexVector vertices_;
   std::set<VertexId> valid_vertices_;
+  VertexId max_vertex_id_;
 
  public:
   UndirectedGraph(uint64_t num_vertices);
@@ -65,6 +66,10 @@ class UndirectedGraph
 
   inline uint64_t Size() const {
     return valid_vertices_.size();
+  }
+
+  inline VertexId MaxVertexId() const {
+    return max_vertex_id_;
   }
 
   inline const std::set<VertexId>& ValidIds() const {

@@ -32,6 +32,11 @@ find_library(TBB_LIB tbb REQUIRED)
 find_path(TBB_INCLUDE_DIR tbb.h PATH_SUFFIXES tbb REQUIRED)
 include_directories(${TBB_INCLUDE_DIR})
 
+# sparsehash
+find_path(SPARSEHASH_INCLUDE_DIR sparse_hash_map PATH_SUFFIXES sparsehash REQUIRED)
+include_directories(${SPARSEHASH_INCLUDE_DIR})
+
+
 set(link_libs
   ${GLOG_LIB}
   ${GFLAGS_LIB}

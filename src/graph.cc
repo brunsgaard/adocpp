@@ -6,7 +6,7 @@
 #include "graph.h"
 #include "dfs.h"
 
-UndirectedGraph::UndirectedGraph(uint64_t num_vertices) : num_vertices_(num_vertices), vertices_(), valid_vertices_() {
+UndirectedGraph::UndirectedGraph(uint64_t num_vertices) : num_vertices_(num_vertices), vertices_(), valid_vertices_(), max_vertex_id_(0) {
   vertices_.reserve(num_vertices);
   // Pre-fill the vertex vector so we don't need to deal with non-initialized members
   for (uint64_t i=0; i < num_vertices; ++i) {
@@ -55,6 +55,9 @@ void UndirectedGraph::RemoveUnconnectedComponents() {
   // Store the biggest set in valid_vertices_
   valid_vertices_.clear();
   valid_vertices_.insert(biggest_sets.top().cbegin(), biggest_sets.top().cend());
+
+  // Set the largest vertex
+  max_vertex_id_ = *std::max_element(valid_vertices_.cbegin(), valid_vertices_.cend());
 
   // Remove the biggest set from the queue
   biggest_sets.pop();

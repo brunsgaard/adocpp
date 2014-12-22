@@ -37,9 +37,9 @@ std::pair<std::vector<Weight>,std::vector<VertexReference>> Dijkstra(const Undir
   return std::make_pair(min_distance, previous);
 }
 
-std::unordered_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
+google::sparse_hash_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
   auto const &vertices = g.Get();
-  std::unordered_map<VertexId, Weight> min_distance;
+  google::sparse_hash_map<VertexId, Weight> min_distance;
   std::set<std::pair<Weight, VertexId> > vertex_queue;
 
   vertex_queue.insert(std::make_pair(0.0, source->id));
@@ -49,7 +49,7 @@ std::unordered_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, 
     vertex_queue.erase(vertex_queue.begin());
 
     // Already searched this node
-    if (min_distance.count(u) > 0) {
+    if (min_distance.count(u)) {
       continue;
     }
     min_distance[u] = dist;
@@ -66,6 +66,7 @@ std::unordered_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, 
       }
     }
   }
+
   return min_distance;
 }
 
