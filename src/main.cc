@@ -147,5 +147,5 @@ int main(int argc, char** argv) {
   auto prepro_end = std::chrono::system_clock::now();
   LOG(INFO) << "Preprocess bench: " << std::chrono::duration_cast<std::chrono::milliseconds>(prepro_end - prepro_start).count() << " ms";
 
-  LOG(INFO) << FLAGS_a << "->" << FLAGS_b << ":  " << Distk(preprocessed.first, preprocessed.second, FLAGS_a, FLAGS_b);
+  LOG(INFO) << FLAGS_a << "->" << FLAGS_b << ":  " << Distk(preprocessed.first, *preprocessed.second, FLAGS_a, FLAGS_b);
 }

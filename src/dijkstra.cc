@@ -1,8 +1,10 @@
 #include <glog/logging.h>
-#include <unordered_map>
-#include <queue>
-#include <list>
 #include <algorithm>
+#include <list>
+#include <queue>
+#include <stdexcept>
+#include <thread>
+#include <unordered_map>
 
 #include "dijkstra.h"
 
@@ -37,10 +39,11 @@ std::pair<std::vector<Weight>,std::vector<VertexReference>> Dijkstra(const Undir
   return std::make_pair(min_distance, previous);
 }
 
-AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
+void DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source, std::shared_ptr<AdoVertexDistMap> distmap, std::mutex &mtx) {
   auto const &vertices = g.Get();
-  std::unordered_map<uint32_t,float> min_distance;
   std::set<std::pair<Weight, VertexId> > vertex_queue;
+
+  AdoClusterEntry cluster;
 
   vertex_queue.insert(std::make_pair(0.0, source->id));
   while (!vertex_queue.empty()) {
@@ -49,10 +52,10 @@ AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic,
     vertex_queue.erase(vertex_queue.begin());
 
     // Already searched this node
-    if (min_distance.count(u)) {
+    if (cluster.count(u)) {
       continue;
     }
-    min_distance[u] = dist;
+    cluster.insert({u,dist});
 
     // Visit each edge exiting u
     const std::forward_list<AdjacentNode> &neighbors = vertices[u]->adjacent;
@@ -67,7 +70,14 @@ AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic,
     }
   }
 
-  return AdoClusterEntry(min_distance.begin(), min_distance.end());
+  auto vid = source->id;
+  // using a local lock_guard to lock mtx guarantees unlocking on destruction / exception:
+  {
+    std::lock_guard<std::mutex> lck(mtx);
+    std::for_each(cluster.cbegin(), cluster.cend(), [distmap,vid](const std::pair<uint32_t, float>& w) {
+      (*distmap)[w.first][vid] = w.second;
+    });
+  }
 }
 
 std::list<VertexReference> DijkstraGetShortestPathTo(
