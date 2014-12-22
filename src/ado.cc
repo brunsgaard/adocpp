@@ -21,7 +21,7 @@ bool TakeNode(const int n, const int k) {
   return r <= pow(n, -1.0 / static_cast<double>(k));
 }
 
-std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k) {
+std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(UndirectedGraph &g, const int k) {
   std::vector<std::unordered_set<VertexId>> a;
   // setup A1 - Ak
   do {
@@ -109,9 +109,7 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
         auto vid = a_vector[n];
         VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
         auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
-        AdoVertexConcurrentDistMap::accessor a;
-        concurrent_clusters->insert(a, vid);
-        a->second = r;
+        concurrent_clusters->insert({vid, r});
         // Output useful stats every 10 seconds
         FB_LOG_EVERY_MS(INFO,10000) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
         FB_LOG_EVERY_MS(INFO,10000) << "Clusters computed: " << concurrent_clusters->size();
@@ -130,19 +128,19 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
   }
 
 
-  AdoVertexDistMap bunch;
+//  AdoVertexDistMap bunch;
 //  std::for_each(clusters.cbegin(), clusters.cend(), [&bunch](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
 //      auto vid = c.first;
 //      std::for_each(c.second.cbegin(), c.second.cend(), [&bunch,vid](const std::pair<VertexId, Weight>& w) {
 //          bunch[w.first][vid] = w.second;
 //      });
 //  });
-  std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [&bunch](const std::pair<VertexId, const AdoClusterEntry &> c) {
-      auto vid = c.first;
-      std::for_each(c.second.begin(), c.second.end(), [&bunch,vid](const std::pair<uint32_t, float>& w) {
-          bunch[w.first][vid] = w.second;
-      });
-  });
+//  std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [&bunch](const std::pair<VertexId, const AdoClusterEntry &> c) {
+//      auto vid = c.first;
+//      std::for_each(c.second.begin(), c.second.end(), [&bunch,vid](const std::pair<uint32_t, float>& w) {
+//          bunch[w.first][vid] = w.second;
+//      });
+//  });
 
 
   VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
@@ -162,23 +160,23 @@ std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k
         });
 
     });
-    std::for_each(bunch.cbegin(), bunch.cend(), [](const std::pair<VertexId, const AdoClusterEntry&> c) {
-        VLOG(2) << "Bunch for vertex " << c.first;
-        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<uint32_t, float>& w) {
-          VLOG(2) << "  " << w.first << ": " << w.second;
-        });
-    });
+//    std::for_each(bunch.cbegin(), bunch.cend(), [](const std::pair<VertexId, const AdoClusterEntry&> c) {
+//        VLOG(2) << "Bunch for vertex " << c.first;
+//        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<uint32_t, float>& w) {
+//          VLOG(2) << "  " << w.first << ": " << w.second;
+//        });
+//    });
   }
-  return std::make_pair(a_dist, bunch);
+  return std::make_pair(a_dist, concurrent_clusters);
 }
 
-Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v) {
+Weight Distk(const AdoADict &a, const std::shared_ptr<AdoVertexConcurrentDistMap> &b, VertexId u, VertexId v) {
   auto w = u;
   int i = 0;
-  while (b.at(v).count(w) == 0) {
+  while (b->at(w).count(v) == 0) {
     ++i;
     std::swap(v,u);
     w = a.at(i).at(u).second;
   }
-  return a.at(i).at(u).first + b.at(v).find(w)->second;
+  return a.at(i).at(u).first + b->at(w).find(v)->second;
 }
