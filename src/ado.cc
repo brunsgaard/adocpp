@@ -1,14 +1,17 @@
 #include <glog/logging.h>
 #include <tbb/tbb.h>
 
-#include <atomic>
-#include <unordered_map>
-#include <queue>
 #include <algorithm>
-#include <vector>
-#include <unordered_set>
-#include <random>
+#include <array>
+#include <atomic>
 #include <ctime>
+#include <initializer_list>
+#include <queue>
+#include <random>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <type_traits>
 
 #include "ado.h"
 #include "graph.h"
@@ -155,7 +158,7 @@ std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(Undi
 //    std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
     std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [](const std::pair<VertexId, const AdoClusterEntry &> c) {
         VLOG(2) << "Cluster for vertex " << c.first;
-        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<VertexId, Weight>& w) {
+        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<uint32_t, float>& w) {
           VLOG(2) << "  " << w.first << ": " << w.second;
         });
 
@@ -170,13 +173,100 @@ std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(Undi
   return std::make_pair(a_dist, concurrent_clusters);
 }
 
-Weight Distk(const AdoADict &a, const std::shared_ptr<AdoVertexConcurrentDistMap> &b, VertexId u, VertexId v) {
+Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v) {
   auto w = u;
   int i = 0;
-  while (b->at(w).count(v) == 0) {
+  while (b.at(v).count(w) == 0) {
     ++i;
     std::swap(v,u);
     w = a.at(i).at(u).second;
   }
-  return a.at(i).at(u).first + b->at(w).find(v)->second;
+  return a.at(i).at(u).first + b.at(v).find(w)->second;
+}
+
+void WritePreprocessedToFile(const std::string &path, const std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> &prepro) {
+  CHECK_STRNE(path.c_str(), "");
+
+  unique_file_ptr fa(std::fopen((path + ".adict").c_str(), "wb"), std::fclose);
+  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "wb"), std::fclose);
+
+  CHECK_NOTNULL(fa.get());
+  CHECK_NOTNULL(fm.get());
+
+  std::for_each(prepro.first.cbegin(), prepro.first.cend(), [&fa](const std::pair<int, const AdoICenter&> &i) {
+    auto ic = i.first;
+    std::for_each(i.second.cbegin(), i.second.cend(), [ic,&fa](const std::pair<VertexId, const AdoLink&> l) {
+      const size_t vars_size = sizeof(ic) + sizeof(l.first) + sizeof(l.second.first) + sizeof(l.second.second);
+      std::array<unsigned char, vars_size> buf;
+      auto it = buf.begin();
+      std::memcpy(it, reinterpret_cast<const unsigned char*>(&ic), sizeof(ic));
+      it += sizeof(ic);
+      std::memcpy(it, reinterpret_cast<const unsigned char*>(&l.first), sizeof(l.first));
+      it += sizeof(l.first);
+      std::memcpy(it, reinterpret_cast<const unsigned char*>(&l.second.first), sizeof(l.second.first));
+      it += sizeof(l.second.first);
+      std::memcpy(it, reinterpret_cast<const unsigned char*>(&l.second.second), sizeof(l.second.second));
+      it += sizeof(l.second.second);
+      std::fwrite(buf.data(), sizeof(unsigned char), buf.size(), fa.get());
+    });
+  });
+  std::for_each(prepro.second->begin(), prepro.second->end(), [&fm](const std::pair<VertexId, const AdoClusterEntry &> c) {
+      auto v = static_cast<uint32_t>(c.first);
+      std::for_each(c.second.begin(), c.second.end(), [v,&fm](const std::pair<uint32_t, float>& w) {
+        static_assert(sizeof(uint32_t) == sizeof(v), "Vertex Id must be 4 bytes");
+        static_assert(sizeof(uint32_t) == sizeof(w.first), "Vertex Id must be 4 bytes");
+        static_assert(sizeof(uint32_t) == sizeof(w.second), "Distance must be 4 bytes");
+        uint32_t dist = *reinterpret_cast<const uint32_t*>(&w.second);
+        std::array<uint32_t,3> buf {{ w.first, v, dist }};  // please note that v and w are swapped where
+        std::fwrite(buf.data(), sizeof(uint32_t), buf.size(), fm.get());
+      });
+  });
+}
+
+std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &path) {
+  CHECK_STRNE(path.c_str(), "");
+
+  unique_file_ptr fa(std::fopen((path + ".adict").c_str(), "rb"), std::fclose);
+  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "rb"), std::fclose);
+
+  CHECK_NOTNULL(fa.get());
+  CHECK_NOTNULL(fm.get());
+
+  // Read data into a new a_dict
+  AdoADict a_dict;
+  {
+    const size_t vars_size = sizeof(AdoADict::key_type) + sizeof(AdoICenter::key_type) + sizeof(AdoLink::first_type) + sizeof(AdoLink::second_type);
+    std::array<unsigned char, vars_size> buf;
+    VLOG(2) << "Reading a_dict using element size of " << vars_size << " bytes";
+    while (fread(buf.data(), sizeof(unsigned char), buf.size(), fa.get()) == vars_size) {
+      auto it = buf.cbegin();
+      auto ic = *reinterpret_cast<const AdoADict::key_type*>(it);
+      it += sizeof(ic);
+      auto vid = *reinterpret_cast<const AdoICenter::key_type*>(it);
+      it += sizeof(vid);
+      auto weight = *reinterpret_cast<const AdoLink::first_type*>(it);
+      it += sizeof(weight);
+      auto reference = *reinterpret_cast<const AdoLink::second_type*>(it);
+      VLOG(2) << ic << " " << vid << " " << weight << " " << reference;
+      a_dict[ic][vid] = std::make_pair(weight, reference);
+    }
+  }
+
+  // Read data into a distance mapping
+  AdoVertexDistMap dist_map;
+  {
+    std::array<uint32_t, 3> buf;
+    while (fread(buf.data(), sizeof(uint32_t), buf.size(), fm.get()) == buf.size()) {
+      auto it = buf.cbegin();
+      uint32_t w = *it;
+      ++it;
+      uint32_t v = *it;
+      ++it;
+      auto weight = *reinterpret_cast<const float*>(it);
+      ++it;
+      dist_map[w][v] = weight;
+      VLOG(2) << "W: " << w << "  V: " << v << "  D: " << weight;
+    }
+  }
+  return std::make_pair(a_dict, dist_map);
 }

@@ -4,6 +4,8 @@
 #include <sparsehash/sparse_hash_map>
 #include <unordered_map>
 #include <utility>
+#include <cstdio>
+#include <memory>
 #include "graph.h"
 
 typedef std::pair<Weight, VertexReference> AdoLink;
@@ -16,4 +18,8 @@ typedef tbb::concurrent_unordered_map<VertexId, AdoClusterEntry> AdoVertexConcur
 
 std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(UndirectedGraph &g, const int k);
 
-Weight Distk(const AdoADict &a, const std::shared_ptr<AdoVertexConcurrentDistMap> &b, VertexId u, VertexId v);
+Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v);
+
+typedef std::unique_ptr<std::FILE, int (*)(std::FILE *)> unique_file_ptr;
+void WritePreprocessedToFile(const std::string &path, const std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> &prepro);
+std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &path);
