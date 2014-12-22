@@ -39,7 +39,7 @@ std::pair<std::vector<Weight>,std::vector<VertexReference>> Dijkstra(const Undir
 
 AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
   auto const &vertices = g.Get();
-  AdoClusterEntry min_distance;
+  std::unordered_map<uint32_t,float> min_distance;
   std::set<std::pair<Weight, VertexId> > vertex_queue;
 
   vertex_queue.insert(std::make_pair(0.0, source->id));
@@ -67,7 +67,7 @@ AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic,
     }
   }
 
-  return min_distance;
+  return AdoClusterEntry(min_distance.begin(), min_distance.end());
 }
 
 std::list<VertexReference> DijkstraGetShortestPathTo(
