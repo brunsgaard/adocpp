@@ -9,8 +9,10 @@
 typedef std::pair<Weight, VertexReference> AdoLink;
 typedef std::unordered_map<VertexId, AdoLink> AdoICenter;
 typedef std::unordered_map<int, AdoICenter> AdoADict;
-typedef std::unordered_map<VertexId, std::unordered_map<VertexId, Weight>> AdoVertexDistMap;
-typedef tbb::concurrent_hash_map<VertexId, google::sparse_hash_map<VertexId, Weight>> AdoVertexConcurrentDistMap;
+//typedef google::sparse_hash_map<VertexId, Weight> AdoClusterEntry;
+typedef google::sparse_hash_map<uint32_t, float> AdoClusterEntry;
+typedef std::unordered_map<VertexId, AdoClusterEntry> AdoVertexDistMap;
+typedef tbb::concurrent_hash_map<VertexId, AdoClusterEntry> AdoVertexConcurrentDistMap;
 
 std::pair<AdoADict, AdoVertexDistMap> PreProcess(UndirectedGraph &g, const int k);
 

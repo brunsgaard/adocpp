@@ -11,7 +11,7 @@
 
 std::pair<std::vector<Weight>,std::vector<VertexReference>> Dijkstra(const UndirectedGraph &g, const std::shared_ptr<Vertex> &source);
 
-google::sparse_hash_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source);
+AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source);
 
 std::list<VertexReference> DijkstraGetShortestPathTo(
     VertexReference vid, const std::vector<VertexReference> &previous);

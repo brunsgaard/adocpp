@@ -37,9 +37,9 @@ std::pair<std::vector<Weight>,std::vector<VertexReference>> Dijkstra(const Undir
   return std::make_pair(min_distance, previous);
 }
 
-google::sparse_hash_map<VertexId, Weight> DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
+AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic, const std::shared_ptr<Vertex> &source) {
   auto const &vertices = g.Get();
-  google::sparse_hash_map<VertexId, Weight> min_distance;
+  AdoClusterEntry min_distance;
   std::set<std::pair<Weight, VertexId> > vertex_queue;
 
   vertex_queue.insert(std::make_pair(0.0, source->id));
