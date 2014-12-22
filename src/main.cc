@@ -118,6 +118,10 @@ int main(int argc, char** argv) {
   CHECK_GT(g.ValidIds().count(FLAGS_a),0);
   CHECK_GT(g.ValidIds().count(FLAGS_b),0);
 
+  // Verify that the maximum vertex id fits in a uint32_t
+  // To reduce memory use at the critical preprocessing stage uint32_t vertex ids are required
+  CHECK_GT(std::numeric_limits<uint32_t>::max(), g.MaxVertexId());
+
   // Dijkstra test
   auto dijkstra_start = std::chrono::system_clock::now();
 
