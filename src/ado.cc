@@ -183,12 +183,12 @@ void PreProcess(UndirectedGraph &g, const int k, const std::string &path) {
 Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v) {
   auto w = u;
   int i = 0;
-  while (b.at(v).count(w) == 0) {
+  while (b.at(w).count(v) == 0) {
     ++i;
     std::swap(v,u);
     w = a.at(i).at(u).second;
   }
-  return a.at(i).at(u).first + b.at(v).find(w)->second;
+  return a.at(i).at(u).first + b.at(w).find(v)->second;
 }
 
 void WritePreprocessedToFile(const std::string &path, const AdoADict &a_dict) {
@@ -215,16 +215,25 @@ void WritePreprocessedToFile(const std::string &path, const AdoADict &a_dict) {
   });
 }
 
-void WritePreprocessedToFile(const unique_file_ptr& fm, VertexId vid, const AdoClusterEntry &cluster) {
+void WritePreprocessedToFile(const unique_file_ptr& fm, VertexId vid, AdoClusterEntry &cluster) {
+  // Write vertex id to file
   auto v = static_cast<uint32_t>(vid);
-  std::for_each(cluster.cbegin(), cluster.cend(), [v,&fm](const std::pair<uint32_t, float>& w) {
-    static_assert(sizeof(uint32_t) == sizeof(v), "Vertex Id must be 4 bytes");
-    static_assert(sizeof(uint32_t) == sizeof(w.first), "Vertex Id must be 4 bytes");
-    static_assert(sizeof(uint32_t) == sizeof(w.second), "Distance must be 4 bytes");
-    uint32_t dist = *reinterpret_cast<const uint32_t*>(&w.second);
-    std::array<uint32_t,3> buf {{ w.first, v, dist }};  // please note that v and w are swapped where
-    std::fwrite(buf.data(), sizeof(uint32_t), buf.size(), fm.get());
-  });
+  std::fwrite(&v, sizeof(uint32_t), 1, fm.get());
+//  // Make room for a size header so many sparse_hash_maps can be kept in same file
+//  long size_head = std::ftell(fm.get());
+//  std::fseek(fm.get(), sizeof(uint32_t), SEEK_CUR);
+//  long start_sparse_hash = std::ftell(fm.get());
+  cluster.serialize(AdoClusterEntry::NopointerSerializer(), fm.get());
+//  long end_sparse_hash = std::ftell(fm.get());
+//
+//  // Seek back and write how big the sparse_hash is
+//  std::fseek(fm.get(), size_head, SEEK_SET);
+//  uint32_t offset = end_sparse_hash - start_sparse_hash;
+//  VLOG(2) << "Wrote sparse hash as " << offset << " bytes";
+//  std::fwrite(&offset, sizeof(uint32_t), 1, fm.get());
+//
+//  // Seek to where we left off
+//  std::fseek(fm.get(), end_sparse_hash, SEEK_SET);
 }
 
 std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &path) {
@@ -259,19 +268,19 @@ std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &pa
   // Read data into a distance mapping
   AdoVertexDistMap dist_map;
   {
-    std::array<uint32_t, 3> buf;
+    std::array<uint32_t, 1> buf;
     while (fread(buf.data(), sizeof(uint32_t), buf.size(), fm.get()) == buf.size()) {
       auto it = buf.cbegin();
-      uint32_t w = *it;
-      ++it;
-      uint32_t v = *it;
-      ++it;
-      auto weight = *reinterpret_cast<const float*>(it);
-      ++it;
-      dist_map[w][v] = weight;
+      uint32_t vertex = *it;
+      AdoClusterEntry cluster;
+      cluster.unserialize(AdoClusterEntry::NopointerSerializer(), fm.get());
       if (VLOG_IS_ON(2)) {
-        VLOG(2) << "W: " << w << "  V: " << v << "  D: " << weight;
+        VLOG(2) << "Cluster for vertex " << vertex;
+        std::for_each(cluster.begin(), cluster.end(), [](const std::pair<uint32_t, float>& w) {
+          VLOG(2) << "  " << w.first << ": " << w.second;
+        });
       }
+      dist_map[vertex] = cluster;
     }
   }
   return std::make_pair(a_dict, dist_map);
