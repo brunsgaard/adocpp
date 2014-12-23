@@ -296,6 +296,10 @@ std::pair<AdoADict, AdoVertexConcurrentDistMap> ReadPreprocessedFile(const std::
               VLOG(2) << "  " << w.first << ": " << w.second;
             });
           }
+        } else {
+          VLOG(2) << "Skipping vertex " << vertex;
+          std::fseek(fm.get(), size, SEEK_CUR);
+          continue;
         }
       }
     }));
