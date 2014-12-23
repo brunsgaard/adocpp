@@ -116,13 +116,6 @@ int main(int argc, char** argv) {
   // To reduce memory use at the critical preprocessing stage uint32_t vertex ids are required
   CHECK_GT(std::numeric_limits<uint32_t>::max(), g.MaxVertexId());
 
-  // Pre process bench
-  auto prepro_start = std::chrono::system_clock::now();
-  // Preprocess graph
-  auto preprocessed = PreProcess(g, 2);
-  auto prepro_end = std::chrono::system_clock::now();
-  LOG(INFO) << "Preprocess bench: " << std::chrono::duration_cast<std::chrono::seconds>(prepro_end - prepro_start).count() << " seconds";
-
   // Figure out where to output
   if (FLAGS_outfile.empty()) {
     auto dot = FLAGS_datafile.find_last_of(".");
@@ -132,10 +125,11 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Output bench
-  auto out_start = std::chrono::system_clock::now();
-  // Write preprocessed data to a file
-  WritePreprocessedToFile(FLAGS_outfile, preprocessed);
-  auto out_end = std::chrono::system_clock::now();
-  LOG(INFO) << "Wrote to output file in: " << std::chrono::duration_cast<std::chrono::seconds>(out_end - out_start).count() << " seconds";
+  // Pre process bench
+  auto prepro_start = std::chrono::system_clock::now();
+  // Preprocess graph
+  PreProcess(g, 2, FLAGS_outfile);
+  auto prepro_end = std::chrono::system_clock::now();
+  LOG(INFO) << "Preprocess bench: " << std::chrono::duration_cast<std::chrono::seconds>(prepro_end - prepro_start).count() << " seconds";
+
 }

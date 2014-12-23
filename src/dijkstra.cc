@@ -67,7 +67,7 @@ AdoClusterEntry DijkstraModified(const UndirectedGraph &g, const AdoICenter &ic,
     }
   }
 
-  return AdoClusterEntry(min_distance.begin(), min_distance.end());
+  return min_distance;
 }
 
 std::list<VertexReference> DijkstraGetShortestPathTo(

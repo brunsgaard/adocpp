@@ -24,7 +24,7 @@ bool TakeNode(const int n, const int k) {
   return r <= pow(n, -1.0 / static_cast<double>(k));
 }
 
-std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(UndirectedGraph &g, const int k) {
+void PreProcess(UndirectedGraph &g, const int k, const std::string &path) {
   std::vector<std::unordered_set<VertexId>> a;
   // setup A1 - Ak
   do {
@@ -66,7 +66,12 @@ std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(Undi
   VLOG(1) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
 
   //AdoVertexDistMap clusters;
-  auto concurrent_clusters = std::make_shared<AdoVertexConcurrentDistMap>();
+  //auto concurrent_clusters = std::make_shared<AdoVertexConcurrentDistMap>();
+
+  CHECK_STRNE(path.c_str(), "");
+  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "wb"), std::fclose);
+  CHECK_NOTNULL(fm.get());
+  std::mutex file_mtx;
 
   for(int i=k-1; i>=0; --i) {
     // Add a vertex connected to all vertices in our set
@@ -107,15 +112,17 @@ std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(Undi
     std::atomic_uint_least64_t v_count(0);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0,a_vector.size()),
-        [concurrent_clusters,&a_dist,&g,&a_vector,i,&v_count](const tbb::blocked_range<size_t>& r) {
+        [&a_dist,&g,&a_vector,i,&v_count,&file_mtx,&fm](const tbb::blocked_range<size_t>& r) {
       for(size_t n=r.begin(); n!=r.end(); ++n) {
         auto vid = a_vector[n];
         VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;
         auto r = DijkstraModified(g, a_dist.at(i+1), g.Get()[vid]);
-        concurrent_clusters->insert({vid, r});
+        {
+          std::lock_guard<std::mutex> lock(file_mtx);
+          WritePreprocessedToFile(fm, vid, r);
+        }
         // Output useful stats every 10 seconds
         FB_LOG_EVERY_MS(INFO,10000) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
-        FB_LOG_EVERY_MS(INFO,10000) << "Clusters computed: " << concurrent_clusters->size();
         uint_least64_t counter = v_count.fetch_add(1);
         FB_LOG_EVERY_MS(INFO,10000) << "Current: " << (counter+1) << "/" << a_vector.size();
       }
@@ -156,13 +163,13 @@ std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(Undi
       });
     });
 //    std::for_each(clusters.cbegin(), clusters.cend(), [](const std::pair<VertexId, const std::unordered_map<VertexId,Weight>&> c) {
-    std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [](const std::pair<VertexId, const AdoClusterEntry &> c) {
-        VLOG(2) << "Cluster for vertex " << c.first;
-        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<uint32_t, float>& w) {
-          VLOG(2) << "  " << w.first << ": " << w.second;
-        });
-
-    });
+//    std::for_each(concurrent_clusters->begin(), concurrent_clusters->end(), [](const std::pair<VertexId, const AdoClusterEntry &> c) {
+//        VLOG(2) << "Cluster for vertex " << c.first;
+//        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<uint32_t, float>& w) {
+//          VLOG(2) << "  " << w.first << ": " << w.second;
+//        });
+//
+//    });
 //    std::for_each(bunch.cbegin(), bunch.cend(), [](const std::pair<VertexId, const AdoClusterEntry&> c) {
 //        VLOG(2) << "Bunch for vertex " << c.first;
 //        std::for_each(c.second.begin(), c.second.end(), [](const std::pair<uint32_t, float>& w) {
@@ -170,7 +177,7 @@ std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> PreProcess(Undi
 //        });
 //    });
   }
-  return std::make_pair(a_dist, concurrent_clusters);
+  WritePreprocessedToFile(path, a_dist);
 }
 
 Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v) {
@@ -184,16 +191,12 @@ Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId 
   return a.at(i).at(u).first + b.at(v).find(w)->second;
 }
 
-void WritePreprocessedToFile(const std::string &path, const std::pair<AdoADict, std::shared_ptr<AdoVertexConcurrentDistMap>> &prepro) {
+void WritePreprocessedToFile(const std::string &path, const AdoADict &a_dict) {
   CHECK_STRNE(path.c_str(), "");
-
   unique_file_ptr fa(std::fopen((path + ".adict").c_str(), "wb"), std::fclose);
-  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "wb"), std::fclose);
-
   CHECK_NOTNULL(fa.get());
-  CHECK_NOTNULL(fm.get());
 
-  std::for_each(prepro.first.cbegin(), prepro.first.cend(), [&fa](const std::pair<int, const AdoICenter&> &i) {
+  std::for_each(a_dict.cbegin(), a_dict.cend(), [&fa](const std::pair<int, const AdoICenter&> &i) {
     auto ic = i.first;
     std::for_each(i.second.cbegin(), i.second.cend(), [ic,&fa](const std::pair<VertexId, const AdoLink&> l) {
       const size_t vars_size = sizeof(ic) + sizeof(l.first) + sizeof(l.second.first) + sizeof(l.second.second);
@@ -210,26 +213,25 @@ void WritePreprocessedToFile(const std::string &path, const std::pair<AdoADict, 
       std::fwrite(buf.data(), sizeof(unsigned char), buf.size(), fa.get());
     });
   });
-  std::for_each(prepro.second->begin(), prepro.second->end(), [&fm](const std::pair<VertexId, const AdoClusterEntry &> c) {
-      auto v = static_cast<uint32_t>(c.first);
-      std::for_each(c.second.begin(), c.second.end(), [v,&fm](const std::pair<uint32_t, float>& w) {
-        static_assert(sizeof(uint32_t) == sizeof(v), "Vertex Id must be 4 bytes");
-        static_assert(sizeof(uint32_t) == sizeof(w.first), "Vertex Id must be 4 bytes");
-        static_assert(sizeof(uint32_t) == sizeof(w.second), "Distance must be 4 bytes");
-        uint32_t dist = *reinterpret_cast<const uint32_t*>(&w.second);
-        std::array<uint32_t,3> buf {{ w.first, v, dist }};  // please note that v and w are swapped where
-        std::fwrite(buf.data(), sizeof(uint32_t), buf.size(), fm.get());
-      });
+}
+
+void WritePreprocessedToFile(const unique_file_ptr& fm, VertexId vid, const AdoClusterEntry &cluster) {
+  auto v = static_cast<uint32_t>(vid);
+  std::for_each(cluster.cbegin(), cluster.cend(), [v,&fm](const std::pair<uint32_t, float>& w) {
+    static_assert(sizeof(uint32_t) == sizeof(v), "Vertex Id must be 4 bytes");
+    static_assert(sizeof(uint32_t) == sizeof(w.first), "Vertex Id must be 4 bytes");
+    static_assert(sizeof(uint32_t) == sizeof(w.second), "Distance must be 4 bytes");
+    uint32_t dist = *reinterpret_cast<const uint32_t*>(&w.second);
+    std::array<uint32_t,3> buf {{ w.first, v, dist }};  // please note that v and w are swapped where
+    std::fwrite(buf.data(), sizeof(uint32_t), buf.size(), fm.get());
   });
 }
 
 std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &path) {
   CHECK_STRNE(path.c_str(), "");
-
   unique_file_ptr fa(std::fopen((path + ".adict").c_str(), "rb"), std::fclose);
-  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "rb"), std::fclose);
-
   CHECK_NOTNULL(fa.get());
+  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "rb"), std::fclose);
   CHECK_NOTNULL(fm.get());
 
   // Read data into a new a_dict
@@ -247,7 +249,9 @@ std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &pa
       auto weight = *reinterpret_cast<const AdoLink::first_type*>(it);
       it += sizeof(weight);
       auto reference = *reinterpret_cast<const AdoLink::second_type*>(it);
-      VLOG(2) << ic << " " << vid << " " << weight << " " << reference;
+      if (VLOG_IS_ON(2)) {
+        VLOG(2) << ic << " " << vid << " " << weight << " " << reference;
+      }
       a_dict[ic][vid] = std::make_pair(weight, reference);
     }
   }
@@ -265,7 +269,9 @@ std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &pa
       auto weight = *reinterpret_cast<const float*>(it);
       ++it;
       dist_map[w][v] = weight;
-      VLOG(2) << "W: " << w << "  V: " << v << "  D: " << weight;
+      if (VLOG_IS_ON(2)) {
+        VLOG(2) << "W: " << w << "  V: " << v << "  D: " << weight;
+      }
     }
   }
   return std::make_pair(a_dict, dist_map);
