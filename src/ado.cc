@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <vector>
 #include <type_traits>
+#include <thread>
+
 
 #include "ado.h"
 #include "graph.h"
@@ -180,15 +182,17 @@ void PreProcess(UndirectedGraph &g, const int k, const std::string &path) {
   WritePreprocessedToFile(path, a_dist);
 }
 
-Weight Distk(const AdoADict &a, const AdoVertexDistMap &b, VertexId u, VertexId v) {
+Weight Distk(const AdoADict &a, const AdoVertexConcurrentDistMap &b, VertexId u, VertexId v) {
   auto w = u;
   int i = 0;
-  while (b.at(w).count(v) == 0) {
+  AdoVertexConcurrentDistMap::element_type::const_accessor it;
+  while (b->find(it,w) && it->second.count(v) == 0) {
     ++i;
     std::swap(v,u);
     w = a.at(i).at(u).second;
   }
-  return a.at(i).at(u).first + b.at(w).find(v)->second;
+  b->find(it,w);
+  return a.at(i).at(u).first + it->second.find(v)->second;
 }
 
 void WritePreprocessedToFile(const std::string &path, const AdoADict &a_dict) {
@@ -219,29 +223,27 @@ void WritePreprocessedToFile(const unique_file_ptr& fm, VertexId vid, AdoCluster
   // Write vertex id to file
   auto v = static_cast<uint32_t>(vid);
   std::fwrite(&v, sizeof(uint32_t), 1, fm.get());
-//  // Make room for a size header so many sparse_hash_maps can be kept in same file
-//  long size_head = std::ftell(fm.get());
-//  std::fseek(fm.get(), sizeof(uint32_t), SEEK_CUR);
-//  long start_sparse_hash = std::ftell(fm.get());
+  // Make room for a size header so many sparse_hash_maps can be kept in same file
+  long size_head = std::ftell(fm.get());
+  std::fseek(fm.get(), sizeof(uint32_t), SEEK_CUR);
+  long start_sparse_hash = std::ftell(fm.get());
   cluster.serialize(AdoClusterEntry::NopointerSerializer(), fm.get());
-//  long end_sparse_hash = std::ftell(fm.get());
-//
-//  // Seek back and write how big the sparse_hash is
-//  std::fseek(fm.get(), size_head, SEEK_SET);
-//  uint32_t offset = end_sparse_hash - start_sparse_hash;
-//  VLOG(2) << "Wrote sparse hash as " << offset << " bytes";
-//  std::fwrite(&offset, sizeof(uint32_t), 1, fm.get());
-//
-//  // Seek to where we left off
-//  std::fseek(fm.get(), end_sparse_hash, SEEK_SET);
+  long end_sparse_hash = std::ftell(fm.get());
+
+  // Seek back and write how big the sparse_hash is
+  std::fseek(fm.get(), size_head, SEEK_SET);
+  uint32_t offset = end_sparse_hash - start_sparse_hash;
+  VLOG(2) << "Wrote sparse hash as " << offset << " bytes";
+  std::fwrite(&offset, sizeof(uint32_t), 1, fm.get());
+
+  // Seek to where we left off
+  std::fseek(fm.get(), end_sparse_hash, SEEK_SET);
 }
 
-std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &path) {
+std::pair<AdoADict, AdoVertexConcurrentDistMap> ReadPreprocessedFile(const std::string &path) {
   CHECK_STRNE(path.c_str(), "");
   unique_file_ptr fa(std::fopen((path + ".adict").c_str(), "rb"), std::fclose);
   CHECK_NOTNULL(fa.get());
-  unique_file_ptr fm(std::fopen((path + ".map").c_str(), "rb"), std::fclose);
-  CHECK_NOTNULL(fm.get());
 
   // Read data into a new a_dict
   AdoADict a_dict;
@@ -266,22 +268,43 @@ std::pair<AdoADict, AdoVertexDistMap> ReadPreprocessedFile(const std::string &pa
   }
 
   // Read data into a distance mapping
-  AdoVertexDistMap dist_map;
-  {
-    std::array<uint32_t, 1> buf;
-    while (fread(buf.data(), sizeof(uint32_t), buf.size(), fm.get()) == buf.size()) {
-      auto it = buf.cbegin();
-      uint32_t vertex = *it;
-      AdoClusterEntry cluster;
-      cluster.unserialize(AdoClusterEntry::NopointerSerializer(), fm.get());
-      if (VLOG_IS_ON(2)) {
-        VLOG(2) << "Cluster for vertex " << vertex;
-        std::for_each(cluster.begin(), cluster.end(), [](const std::pair<uint32_t, float>& w) {
-          VLOG(2) << "  " << w.first << ": " << w.second;
-        });
+  AdoVertexConcurrentDistMap dist_map(new AdoVertexConcurrentDistMap::element_type);
+
+  std::vector<std::thread> workers;
+  for (int i = 0; i < 8; i++) {
+    workers.push_back(std::thread([path,&dist_map]()
+    {
+      unique_file_ptr fm(std::fopen((path + ".map").c_str(), "rb"), std::fclose);
+      CHECK_NOTNULL(fm.get());
+      std::array<uint32_t, 2> buf;
+      while (fread(buf.data(), sizeof(uint32_t), buf.size(), fm.get()) == buf.size()) {
+        auto it = buf.cbegin();
+        uint32_t vertex = *it;
+        ++it;
+        uint32_t size = *it;
+        if (dist_map->count(vertex)) {  // some other thead got this, skip
+          VLOG(2) << "Skipping vertex " << vertex;
+          std::fseek(fm.get(), size, SEEK_CUR);
+          continue;
+        }
+        AdoVertexConcurrentDistMap::element_type::accessor a;
+        if (dist_map->insert(a, vertex)) {  // if returns false, another thread beat us to it
+          a->second.unserialize(AdoClusterEntry::NopointerSerializer(), fm.get());
+          if (VLOG_IS_ON(2)) {
+            VLOG(2) << "Cluster for vertex " << vertex;
+            std::for_each(a->second.begin(), a->second.end(), [](const std::pair<uint32_t, float>& w) {
+              VLOG(2) << "  " << w.first << ": " << w.second;
+            });
+          }
+        }
       }
-      dist_map[vertex] = cluster;
-    }
+    }));
   }
-  return std::make_pair(a_dict, dist_map);
+
+  std::for_each(workers.begin(), workers.end(), [](std::thread &t)
+  {
+     t.join();
+  });
+
+  return std::make_pair(std::move(a_dict), std::move(dist_map));
 }
