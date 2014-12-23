@@ -10,12 +10,14 @@
 #include "utils.h"
 #include "dijkstra.h"
 #include "ado.h"
+#include "sample.h"
 
 DEFINE_string(datafile, "", "File to load as graph data");
 DEFINE_bool(duplicated, false, "Does data file contain duplicated graph data");
 DEFINE_string(infile, "", "Where to load preprocessed data");
 DEFINE_int64(a, 2000, "From where?");
 DEFINE_int64(b, 3000, "To where?");
+DEFINE_int32(n, 10, "How many samples to test?");
 
 UndirectedGraph loadWeightedGraph(std::ifstream &file) {
   // Find the largest vertex id
@@ -149,4 +151,18 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Read preprocessed data in: " << std::chrono::duration_cast<std::chrono::seconds>(in_end - in_start).count() << " seconds";
 
   LOG(INFO) << FLAGS_a << "->" << FLAGS_b << ":  " << Distk(preprocessed.first, preprocessed.second, FLAGS_a, FLAGS_b);
+
+
+  auto samples = GenerateSample(g, FLAGS_n);
+
+  std::for_each(samples.cbegin(), samples.cend(),
+      [&](std::pair<uint32_t, uint32_t> p){
+      auto act_dist = Dijkstra(g, g.Get()[p.first]).first[p.second];
+      auto ado_dist = Distk(preprocessed.first, preprocessed.second, p.first, p.second);
+      // Division with zero will fail (nan)
+      LOG(INFO) << p.first << "->" << p.second << "  ado:" <<  ado_dist << "  act:" << act_dist << "  s: " << ado_dist/act_dist;
+      if (act_dist != 0) CHECK_LE(ado_dist/act_dist, 3);
+      //LOG(INFO) << ado_dist/act_dist;
+      });
+
 }

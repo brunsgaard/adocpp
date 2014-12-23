@@ -4,6 +4,7 @@ SET(headers
   dfs.h
   dijkstra.h
   ado.h
+  sample.h
 )
 
 SET(sources
@@ -11,6 +12,7 @@ SET(sources
   dfs.cc
   dijkstra.cc
   ado.cc
+  sample.cc
 )
 
 add_library(compiled OBJECT ${sources} ${headers})
