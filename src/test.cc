@@ -1,10 +1,14 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <tbb/tbb.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <fstream>
 #include <memory>
+#include <thread>
+#include <iostream>
 
 #include "graph.h"
 #include "utils.h"
@@ -150,19 +154,41 @@ int main(int argc, char** argv) {
   auto in_end = std::chrono::system_clock::now();
   LOG(INFO) << "Read preprocessed data in: " << std::chrono::duration_cast<std::chrono::seconds>(in_end - in_start).count() << " seconds";
 
-  LOG(INFO) << FLAGS_a << "->" << FLAGS_b << ":  " << Distk(preprocessed.first, preprocessed.second, FLAGS_a, FLAGS_b);
-
+  //LOG(INFO) << FLAGS_a << "->" << FLAGS_b << ":  " << Distk(preprocessed.first, preprocessed.second, FLAGS_a, FLAGS_b);
 
   auto samples = GenerateSample(g, FLAGS_n);
 
-  std::for_each(samples.cbegin(), samples.cend(),
-      [&](std::pair<uint32_t, uint32_t> p){
+
+  std::string path = "";
+  if (path.empty()) {
+    auto dot = FLAGS_datafile.find_last_of(".");
+    if (dot != std::string::npos) {
+      path = FLAGS_datafile.substr(0,dot);
+      LOG(INFO) << "Defaulting results to output at " << path + ".res";
+    }
+  }
+
+  std::mutex file_mtx;
+  std::ofstream myfile;
+  myfile.open (path + ".res");
+  std::atomic_uint_least64_t counter(0);
+
+  tbb::parallel_for(tbb::blocked_range<size_t>(0,samples.size()),
+      [&samples, &preprocessed, &g, &file_mtx, &myfile, &counter](const tbb::blocked_range<size_t>& r) {
+    for(size_t n=r.begin(); n!=r.end(); ++n) {
+      auto p = samples[n];
       auto act_dist = Dijkstra(g, g.Get()[p.first]).first[p.second];
       auto ado_dist = Distk(preprocessed.first, preprocessed.second, p.first, p.second);
-      // Division with zero will fail (nan)
-      LOG(INFO) << p.first << "->" << p.second << "  ado:" <<  ado_dist << "  act:" << act_dist << "  s: " << ado_dist/act_dist;
       if (act_dist != 0) CHECK_LE(ado_dist/act_dist, 3);
-      //LOG(INFO) << ado_dist/act_dist;
-      });
+      {
+        std::lock_guard<std::mutex> lock(file_mtx);
+        myfile << act_dist << " " << ado_dist <<"\n";
+      }
+      uint_least64_t current_count = counter.fetch_add(1);
+      FB_LOG_EVERY_MS(INFO,60000*15) << "Current: " << (current_count+1) << "/" << samples.size();
+    }
+  });
 
+  myfile.close();
+  LOG(INFO) << "Closed: " << path + ".res";
 }

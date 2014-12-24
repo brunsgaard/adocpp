@@ -124,11 +124,12 @@ void PreProcess(UndirectedGraph &g, const int k, const std::string &path) {
           WritePreprocessedToFile(fm, vid, r);
         }
         // Output useful stats every 10 seconds
-        FB_LOG_EVERY_MS(INFO,10000) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
+        // FB_LOG_EVERY_MS(INFO,10000) << "Ram used: " << static_cast<double>(getMemoryUsage()) / 1024 / 1024;
         uint_least64_t counter = v_count.fetch_add(1);
-        FB_LOG_EVERY_MS(INFO,10000) << "Current: " << (counter+1) << "/" << a_vector.size();
+        FB_LOG_EVERY_MS(INFO,60000) << "Current: " << (counter+1) << "/" << a_vector.size();
       }
     });
+    //LOG(INFO) << "";
 
 //    std::for_each(a_filtered.cbegin(), a_filtered.cend(), [&](VertexId vid) {
 //      VLOG(2) << "Dijkstra mod for IC: " << i+1 << " Vertex " << vid;

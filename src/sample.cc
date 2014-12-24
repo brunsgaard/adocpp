@@ -23,7 +23,7 @@ std::vector<std::pair<uint32_t, uint32_t>> GenerateSample(UndirectedGraph& g,
                                                           uint32_t n) {
   auto population = std::set<std::pair<uint32_t, uint32_t>>();
   auto vertices = g.ValidIds();
-  while (population.size() <= n) {
+  while (population.size() < n) {
     uint32_t from = *select_randomly(vertices.begin(), vertices.end());
     uint32_t to = *select_randomly(vertices.begin(), vertices.end());
     population.emplace(from, to);
